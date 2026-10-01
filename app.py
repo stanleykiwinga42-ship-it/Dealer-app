@@ -1,6 +1,6 @@
 """
 Dealer Positioning Dashboard (Streamlit app)
-Keep this file in the same folder as dealer_positioning.py
+Files needed in the same folder: dealer_positioning.py, trade_plan.py
 Run locally: streamlit run app.py
 """
 
@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 import dealer_positioning as dp
+import trade_plan as tp
 
 st.set_page_config(page_title="Dealer Positioning", page_icon="🥇", layout="wide")
 
@@ -28,26 +29,44 @@ def load_price(symbol: str) -> float:
     return dp.last_price(symbol)
 
 
+@st.cache_data(ttl=300)
+def load_tv_auto():
+    return tp.spot_from_yahoo()
+
+
+@st.cache_data(ttl=900)
+def load_atr():
+    return tp.get_atr("GC=F")
+
+
 # ---------------------------------------------------------------- sidebar
 st.sidebar.title("Settings")
+tv_input = st.sidebar.number_input(
+    "TradingView XAUUSD price now (0 = auto)", min_value=0.0, value=0.0, step=0.1,
+    help="Type the live price from your TradingView chart. This is the most reliable way "
+         "to match the app to your chart.")
 days = st.sidebar.slider("Options expiry window (days)", 7, 90, 45)
-levels_text = st.sidebar.text_input("Your QuikStrike gold levels (comma-separated)", "")
+levels_text = st.sidebar.text_input(
+    "QuikStrike levels (futures price, comma-separated)", "",
+    help="Type the levels exactly as shown on CME QuikStrike. The app shifts them to "
+         "TradingView prices.")
 if st.sidebar.button("Refresh data"):
     st.cache_data.clear()
     st.rerun()
-levels = [float(x) for x in levels_text.split(",") if x.strip()]
+manual = [float(x) for x in levels_text.split(",") if x.strip()]
 
 st.title("Dealer Positioning Dashboard")
-st.caption("Free data only: CFTC COT + GLD options. Decision support, not financial advice.")
+st.caption("Free data: CFTC COT + GLD options. Rule-based framework, not financial advice.")
 
 tab_gold, tab_gj = st.tabs(["XAUUSD (Gold)", "GBPJPY"])
 
 # ---------------------------------------------------------------- gold
 with tab_gold:
-    parts = []  # (name, score, weight)
-    cot, cot_df, op, spot, ratio, gc = None, None, None, None, None, None
+    parts, comps = [], {}
+    cot = cot_df = op = chain = lv = None
+    spot = gc = ratio = None
 
-    # COT (independent of options)
+    # COT
     try:
         cot_df = load_cot(dp.COT_CODES["GOLD"])
         cot = dp.analyze_cot(cot_df)
@@ -55,33 +74,107 @@ with tab_gold:
     except Exception as e:
         st.error(f"COT data failed: {e}")
 
-    # Options (independent of COT)
+    # Prices
+    try:
+        gc = load_price("GC=F")
+    except Exception:
+        gc = None
+
+    # Options
+    opts_ok = False
     try:
         spot, chain = load_gld(days)
         op = dp.analyze_options(spot, chain)
+        lv = tp.clean_levels(spot, chain)
+        if gc:
+            ratio = gc / spot
+        opts_ok = bool(lv["ok"] and ratio)
+    except Exception as e:
+        st.warning(f"Options data unavailable. Reason: {e}")
+
+    if opts_ok:
         parts.append(("Flow", float(np.clip(1.0 - op["pc_vol"], -1, 1)) * 0.5, 0.2))
         if op["skew"] is not None:
             parts.append(("Skew", float(np.clip(-op["skew"] * 5, -1, 1)), 0.2))
         if op["flip"]:
             parts.append(("Vs gamma flip", 0.3 if spot > op["flip"] else -0.3, 0.2))
-        try:
-            gc = load_price("GC=F")
-            ratio = gc / spot
-        except Exception:
-            gc, ratio = None, None
-    except Exception as e:
-        st.warning(f"Options data unavailable, showing COT only. Reason: {e}")
+    elif lv is not None:
+        st.warning(f"Options data looks unreliable right now (only {lv['share'] * 100:.0f}% of "
+                   f"strikes have open interest). Options levels are ignored; the plan uses "
+                   f"COT and volatility only.")
 
-    # Verdict
-    if parts:
-        total = sum(s * w for _, s, w in parts) / sum(w for _, _, w in parts)
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Gold (GC)", f"{gc:,.1f}" if gc else "n/a")
-        c2.metric("Bias", dp.label(total), f"{total:+.2f}")
-        if op:
-            c3.metric("Gamma regime", "Positive" if op["net_gex"] > 0 else "Negative")
+    # TradingView alignment
+    tv = tv_input if tv_input > 0 else load_tv_auto()
+    tv_source = "typed" if tv_input > 0 else "auto (Yahoo, verify vs your chart)"
+    offset = tp.tv_offset(tv, gc)
+    price = tv or gc
+
+    if price is None:
+        st.error("Could not get a gold price. Type the TradingView price in the sidebar.")
+    else:
+        total = sum(s * w for _, s, w in parts) / sum(w for _, _, w in parts) if parts else 0.0
+        comps = {n: s for n, s, _ in parts}
+
+        c1, c2 = st.columns(2)
+        c1.metric("TradingView XAUUSD", f"{price:,.2f}", tv_source if tv else "futures price")
+        c2.metric("Offset (TV minus futures)", f"{offset:+.2f}")
+        c3, c4 = st.columns(2)
+        c3.metric("Bias", dp.label(total), f"{total:+.2f}")
+        c4.metric("Gamma regime",
+                  ("Positive" if op["net_gex"] > 0 else "Negative") if opts_ok else "n/a")
+
+        # Levels in TradingView prices
+        levels = []
+        if opts_ok:
+            if lv["put_wall"]:
+                levels.append(("Put wall", tp.to_tv(lv["put_wall"], ratio, offset)))
+            if lv["call_wall"]:
+                levels.append(("Call wall", tp.to_tv(lv["call_wall"], ratio, offset)))
+            if op["flip"]:
+                levels.append(("Gamma flip", tp.to_tv(op["flip"], ratio, offset)))
+        for m in manual:
+            levels.append((f"QuikStrike {m:g}", m + offset))
+
+        # Trade plan
+        atr, atr_label = load_atr()
+        if atr is None:
+            atr, atr_label = price * 0.004, "estimate"
+
+        plan = tp.build_plan(price, total, comps, atr, levels,
+                             (op["net_gex"] > 0) if opts_ok else None, opts_ok,
+                             cot["pct"] if cot else None)
+
+        st.subheader("Trade plan")
+        if plan["side"] == "WAIT":
+            st.info("WAIT. " + plan["reasons"][0])
         else:
-            c3.metric("Gamma regime", "n/a")
+            msg = f"{plan['side']}  |  Quality: {plan['grade']} ({plan['score']}/100)"
+            if plan["grade"] == "GOOD":
+                st.success(msg)
+            elif plan["grade"] == "MID":
+                st.warning(msg)
+            else:
+                st.error(msg)
+            p1, p2 = st.columns(2)
+            p1.metric("Entry", f"{plan['entry']:,.2f}", plan["entry_type"])
+            p2.metric("Stop loss", f"{plan['sl']:,.2f}", f"risk {plan['risk_pts']:.1f} pts")
+            p3, p4 = st.columns(2)
+            p3.metric("TP1", f"{plan['tp1']:,.2f}", f"{plan['rr1']:.1f}R")
+            p4.metric("TP2", f"{plan['tp2']:,.2f}", f"{plan['rr2']:.1f}R")
+            for r in plan["reasons"]:
+                st.write("• " + r)
+        for w in plan["warnings"]:
+            st.warning(w)
+        st.caption(f"Stop distance uses {atr_label} ATR(14) = {atr:.1f} pts. "
+                   f"Entry above/below price are limit orders at levels; check before placing.")
+
+        # Levels table
+        if levels:
+            st.subheader("Key levels (TradingView prices)")
+            rows = [{"Level": n, "Price": round(p, 1), "Distance": round(p - price, 1),
+                     "Role": "Resistance" if p > price else "Support"}
+                    for n, p in sorted(levels, key=lambda x: x[1], reverse=True)]
+            st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
 
     # COT section
     if cot is not None:
@@ -90,33 +183,21 @@ with tab_gold:
                  f"4w change {cot['chg4']:+,} | report {cot['date']}")
         st.line_chart(cot_df.set_index("date")[["mm_net", "swap_net"]])
 
-    # Options section
-    if op is not None:
-        st.subheader("Options levels")
-        conv = (lambda x: round(x * ratio)) if ratio else (lambda x: x)
-        unit = "gold price" if ratio else "GLD price"
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric(f"Put wall ({unit})", f"{conv(op['put_wall']):,}" if op["put_wall"] else "n/a")
-        m2.metric(f"Call wall ({unit})", f"{conv(op['call_wall']):,}" if op["call_wall"] else "n/a")
-        m3.metric(f"Gamma flip ({unit})", f"{conv(op['flip']):,}" if op["flip"] else "n/a")
-
-        if op["net_gex"] > 0:
-            st.success("Positive gamma: fade the walls, expect ranges.")
-        else:
-            st.warning("Negative gamma: moves accelerate, favor breakouts.")
-
-        near = chain[(chain.strike > spot * 0.9) & (chain.strike < spot * 1.1)].copy()
-        near["level"] = (near.strike * (ratio or 1)).round().astype(int)
-        st.caption(f"Open interest by strike ({unit})")
-        st.bar_chart(near.pivot_table(index="level", columns="side",
-                                      values="openInterest", aggfunc="sum").fillna(0))
-
+    # Options detail
+    if opts_ok:
+        st.subheader("Options detail")
         k1, k2, k3 = st.columns(3)
         k1.metric("Put/Call OI", f"{op['pc_oi']:.2f}")
         k2.metric("Put/Call volume", f"{op['pc_vol']:.2f}")
         k3.metric("Skew", f"{op['skew']:+.3f}" if op["skew"] is not None else "n/a")
 
+        near = chain[(chain.strike > spot * 0.9) & (chain.strike < spot * 1.1)
+                     & (chain.openInterest > 0)].copy()
+        if not near.empty:
+            near["level"] = (near.strike * ratio + offset).round().astype(int)
+            st.caption("Open interest by strike (TradingView price)")
+            st.bar_chart(near.pivot_table(index="level", columns="side",
+                                          values="openInterest", aggfunc="sum").fillna(0))
         if not op["unusual"].empty:
             st.caption("Unusual volume (volume > 3x OI)")
             st.dataframe(op["unusual"], hide_index=True, use_container_width=True)
@@ -126,14 +207,9 @@ with tab_gold:
         st.dataframe(pd.DataFrame(parts, columns=["Signal", "Score", "Weight"]),
                      hide_index=True, use_container_width=True)
 
-    if levels and gc:
-        st.subheader("Your levels")
-        rows = [{"Level": lv, "Distance (pts)": round(lv - gc, 1),
-                 "Role": "Resistance" if lv > gc else "Support"} for lv in sorted(levels)]
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-
-    st.caption("Confirm at levels with order flow before entry. GLD-based GEX is a proxy "
-               "for COMEX gold and assumes customers are long calls.")
+    st.caption("Confirm at levels with order flow before entry. GLD-based levels are a proxy "
+               "for COMEX gold. Futures-to-spot offset changes over time, so retype the "
+               "TradingView price each session.")
 
 # ---------------------------------------------------------------- GBPJPY
 with tab_gj:
