@@ -107,24 +107,45 @@ def bs_gamma(S, K, T, sigma):
 
 
 def fetch_gld_chain(max_days: int):
+    import time
     t = yf.Ticker("GLD")
-    spot = float(t.history(period="5d")["Close"].iloc[-1])
+    hist = t.history(period="5d")
+    if hist.empty:
+        raise ValueError("Yahoo returned no GLD price (source blocked or rate limited)")
+    spot = float(hist["Close"].iloc[-1])
+
+    exps = []
+    for _ in range(3):
+        try:
+            exps = list(t.options)
+        except Exception:
+            exps = []
+        if exps:
+            break
+        time.sleep(2)
+    if not exps:
+        raise ValueError("Yahoo returned no GLD option expiries "
+                         "(likely blocking this server). Press Refresh in a few minutes.")
+
     today = pd.Timestamp.today().normalize()
+    parsed = [(e, (pd.Timestamp(e) - today).days) for e in exps]
+    parsed = [p for p in parsed if p[1] >= 0]
+    chosen = [p for p in parsed if p[1] <= max_days] or parsed[:4]
+
     frames = []
-    for exp in t.options:
-        exp_dt = pd.Timestamp(exp)
-        dte = (exp_dt - today).days
-        if dte < 0 or dte > max_days:
+    for exp, dte in chosen:
+        try:
+            ch = t.option_chain(exp)
+        except Exception:
             continue
-        ch = t.option_chain(exp)
         for side, d in (("call", ch.calls), ("put", ch.puts)):
             d = d.copy()
             d["side"] = side
-            d["expiry"] = exp_dt
+            d["expiry"] = pd.Timestamp(exp)
             d["dte"] = max(dte, 1)
             frames.append(d)
     if not frames:
-        raise ValueError("No GLD option expiries in range")
+        raise ValueError("Could not download any GLD option chains")
     df = pd.concat(frames, ignore_index=True)
     for c in ("openInterest", "volume", "impliedVolatility", "strike"):
         df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
