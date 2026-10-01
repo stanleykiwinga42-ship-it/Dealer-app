@@ -1,6 +1,6 @@
 """
 Dealer Positioning Dashboard (Streamlit app) - intraday version
-Files needed in the same folder: dealer_positioning.py, trade_plan.py, intraday.py
+Files needed in the same folder: dealer_positioning.py, trade_plan.py, intraday.py, cboe.py
 Run locally: streamlit run app.py
 """
 
@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+import cboe
 import dealer_positioning as dp
 import intraday as idy
 import trade_plan as tp
@@ -24,7 +25,12 @@ def load_cot(code: str) -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def load_gld(days: int):
-    return dp.fetch_gld_chain(days)
+    try:
+        spot, chain = cboe.fetch_chain("GLD", days)
+        return spot, chain, "Cboe (about 15 min delayed)"
+    except Exception as e:
+        spot, chain = dp.fetch_gld_chain(days)
+        return spot, chain, f"Yahoo backup (Cboe failed: {str(e)[:80]})"
 
 
 @st.cache_data(ttl=30)
@@ -100,6 +106,7 @@ with tab_gold:
     parts = []
     cot = cot_df = op = chain = lv = exp = None
     spot = ratio = None
+    opt_src = ""
 
     try:
         cot_df = load_cot(dp.COT_CODES["GOLD"])
@@ -110,7 +117,7 @@ with tab_gold:
 
     opts_ok = False
     try:
-        spot, chain = load_gld(days)
+        spot, chain, opt_src = load_gld(days)
         op = dp.analyze_options(spot, chain)
         lv = tp.clean_levels(spot, chain)
         if gc_now:
@@ -205,6 +212,8 @@ with tab_gold:
 
     st.subheader("Market conditions")
     st.write(f"**Session:** {session['name']}")
+    if opt_src:
+        st.write(f"**Options data source:** {opt_src}")
     if exp:
         st.write(f"**Next options expiry:** {exp['date']} ({exp['dte']} day(s)). "
                  + (f"Max-pain price ~{pin:,.0f}." if pin else ""))
