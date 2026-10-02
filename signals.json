@@ -1,0 +1,37 @@
+[
+ {
+  "id": "2026-10-02T16:22:50.250231+00:00",
+  "created": "2026-10-02T16:22:50.250231+00:00",
+  "checked_until": "2026-10-02T16:22:50.250231+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Trend continuation (negative gamma)",
+  "grade": "B (mid)",
+  "score": 62,
+  "entry": 4165.801862444197,
+  "entry_type": "Limit pullback",
+  "sl": 4182.608921595982,
+  "tp1": 4148.994803292411,
+  "tp2": 4132.187744140626,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 16.807059151785325,
+  "offset": 0.0,
+  "price_at_signal": 4161.60009765625,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
+  "closed_at": null,
+  "close_price": null,
+  "r": null,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "15m and 1h trend both agree.",
+   "Negative gamma: moves extend, trend trade fits."
+  ],
+  "warnings": [
+   "Price already stretched (RSI): chasing risk.",
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
+ }
+]
