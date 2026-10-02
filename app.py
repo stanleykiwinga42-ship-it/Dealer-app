@@ -1,6 +1,7 @@
 """
-Dealer Positioning Dashboard (Streamlit app) - intraday version
-Files needed in the same folder: dealer_positioning.py, trade_plan.py, intraday.py, cboe.py
+Dealer Positioning Dashboard (Streamlit app) - intraday version with locked signals
+Files needed in the same folder: dealer_positioning.py, trade_plan.py, intraday.py,
+cboe.py, journal.py (signals.json is written by monitor.py on GitHub Actions)
 Run locally: streamlit run app.py
 """
 
@@ -13,6 +14,7 @@ import streamlit as st
 import cboe
 import dealer_positioning as dp
 import intraday as idy
+import journal as jr
 import trade_plan as tp
 
 st.set_page_config(page_title="Dealer Positioning", page_icon="🥇", layout="wide")
@@ -48,18 +50,13 @@ ss = st.session_state
 st.sidebar.title("Settings")
 tv_input = st.sidebar.number_input(
     "TradingView XAUUSD price now (0 = auto)", min_value=0.0, value=0.0, step=0.1,
-    help="Type the live price from your TradingView chart. The app locks the gap between "
-         "TradingView and futures at that moment, then tracks the live price from it. "
-         "Type a new price any time to re-sync.")
+    help="Used for the live read on this screen. Locked signals come from the background "
+         "monitor, which uses an automatic offset.")
 risk_usd = st.sidebar.number_input("Risk per trade ($)", min_value=1.0, value=50.0, step=10.0)
 days = st.sidebar.slider("Options expiry window (days)", 7, 90, 30)
-levels_text = st.sidebar.text_input(
-    "Extra levels (futures price, comma-separated)", "",
-    help="Levels you read from CME QuikStrike or elsewhere, in futures price. "
-         "The app shifts them to TradingView prices.")
+levels_text = st.sidebar.text_input("Extra levels (futures price, comma-separated)", "")
 with st.sidebar.expander("Paste CME QuikStrike OI table"):
-    st.caption("One line per strike: strike call_oi put_oi (plain numbers, in futures strikes). "
-               "Example: 4200 1800 100")
+    st.caption("One line per strike: strike call_oi put_oi (plain numbers, futures strikes).")
     paste_text = st.text_area("OI table", "", height=150)
 if st.sidebar.button("Refresh everything"):
     st.cache_data.clear()
@@ -79,7 +76,7 @@ else:
     ss["tv_typed"] = None
     auto = load_live("XAUUSD=X")
     ss["offset"] = (auto - gc_now) if (auto and gc_now) else 0.0
-    offset_src = "auto from Yahoo spot gold (type your TradingView price to be exact)"
+    offset_src = "auto from Yahoo spot gold"
 offset = float(ss.get("offset", 0.0))
 
 
@@ -92,6 +89,87 @@ def price_strip():
     b.metric("GC futures", f"{g:,.2f}" if g else "n/a")
     st.caption(f"Live price updates every 15s | {datetime.now(timezone.utc):%H:%M:%S} UTC | "
                f"Yahoo can lag 1-2 min")
+
+
+STATUS_TXT = {"PENDING": "WAITING FOR ENTRY",
+              "OPEN": "ENTERED: trade is live",
+              "TP1_HIT": "TP1 HIT: stop at entry, running to TP2"}
+RESULT_TXT = {"WON_TP2": "TP2 hit (win)", "LOST_SL": "Stop loss hit (loss)",
+              "TP1_THEN_BE": "TP1 hit, then stopped at entry",
+              "MISSED": "Missed: price ran away, never filled",
+              "EXPIRED": "Expired: never filled", "CANCELLED": "Cancelled",
+              "TIME_EXIT": "Time exit", "MANUAL_EXIT": "Closed manually"}
+
+
+@st.fragment(run_every=30)
+def signal_panel():
+    trades = jr.load()
+    t = jr.active(trades)
+    shown = None
+    if t is not None:
+        bars = idy.get_bars("GC=F", "1m", "5d")
+        shown = jr.replay(t, bars)[0] if bars is not None else t
+
+    if shown is None:
+        st.info("No active signal. The background monitor will alert your phone when a "
+                "setup with the minimum grade appears. Levels never change once a signal "
+                "is created.")
+    elif shown["status"] not in jr.ACTIVE:
+        res = RESULT_TXT.get(shown["status"], shown["status"])
+        msg = f"CLOSED: {res} | {shown['side']} {shown['setup']} | R = {shown['r']:+.2f}"
+        (st.success if shown["r"] > 0 else st.error if shown["r"] < 0 else st.info)(msg)
+        st.caption("History below updates within a few minutes.")
+    else:
+        d = 1 if shown["side"] == "LONG" else -1
+        live = idy.live_price("GC=F")
+        tv_live = live + shown["offset"] if live else None
+        msg = (f"{STATUS_TXT[shown['status']]} | {shown['side']} | {shown['setup']} | "
+               f"Grade {shown['grade']} ({shown['score']}/100)")
+        (st.info if shown["status"] == "PENDING" else st.warning if shown["status"] == "OPEN"
+         else st.success)(msg)
+        stop = shown["entry"] if shown["status"] == "TP1_HIT" else shown["sl"]
+        c1, c2 = st.columns(2)
+        c1.metric("Entry", f"{shown['entry']:,.2f}", shown["entry_type"], delta_color="off")
+        c2.metric("Stop loss", f"{stop:,.2f}",
+                  "moved to entry" if shown["status"] == "TP1_HIT"
+                  else f"risk {shown['risk_pts']:.1f} pts", delta_color="off")
+        c3, c4 = st.columns(2)
+        c3.metric("TP1", f"{shown['tp1']:,.2f}", f"{shown['rr1']:.1f}R", delta_color="off")
+        c4.metric("TP2", f"{shown['tp2']:,.2f}", f"{shown['rr2']:.1f}R", delta_color="off")
+        if tv_live:
+            if shown["status"] == "PENDING":
+                st.write(f"Live price {tv_live:,.2f} | {abs(tv_live - shown['entry']):.1f} pts "
+                         f"from entry")
+            else:
+                fl = d * (tv_live - shown["entry"]) / shown["risk_pts"]
+                st.write(f"Live price {tv_live:,.2f} | floating {fl:+.2f}R")
+        lots = risk_usd / (shown["risk_pts"] * 100) if shown["risk_pts"] else 0
+        st.write(f"**Size:** about {lots:.2f} lots for ${risk_usd:,.0f} risk "
+                 f"(100 oz per lot; check your broker).")
+        created = pd.Timestamp(shown["created"]).strftime("%b %d %H:%M")
+        filled = (pd.Timestamp(shown["filled_at"]).strftime("%b %d %H:%M")
+                  if shown.get("filled_at") else "not yet")
+        st.caption(f"Created {created} UTC | Entered: {filled} UTC | Levels are locked. "
+                   f"Rule: half off at TP1, stop to entry, rest to TP2. Intraday only.")
+        for r in shown["reasons"]:
+            st.write("• " + r)
+        for w in shown["warnings"]:
+            st.warning(w)
+
+    st.subheader("History")
+    s = jr.stats(trades)
+    if s:
+        h1, h2, h3, h4 = st.columns(4)
+        h1.metric("Trades", s["trades"])
+        h2.metric("Win rate", f"{s['win_rate']:.0f}%")
+        h3.metric("Total R", f"{s['total_r']:+.2f}")
+        h4.metric("Avg R", f"{s['avg_r']:+.2f}")
+    hist = jr.history_df(trades)
+    if hist.empty:
+        st.caption("No finished signals yet.")
+    else:
+        st.dataframe(hist.head(30), hide_index=True, use_container_width=True)
+    st.caption("History is saved in signals.json in your GitHub repository.")
 
 
 st.title("Dealer Positioning Dashboard")
@@ -135,9 +213,8 @@ with tab_gold:
         if op["flip"]:
             parts.append(("Vs gamma flip", 0.3 if spot > op["flip"] else -0.3, 0.2))
     elif lv is not None:
-        st.warning(f"GLD options data looks unreliable (only {lv['share'] * 100:.0f}% of strikes "
-                   f"have open interest), so it is ignored. Paste CME levels in the sidebar for "
-                   f"better results.")
+        st.warning(f"Options data looks unreliable (only {lv['share'] * 100:.0f}% of strikes "
+                   f"have open interest), so it is ignored.")
 
     price = (gc_now + offset) if gc_now else (tv_input or None)
     if price is None:
@@ -146,7 +223,6 @@ with tab_gold:
 
     total = sum(s * w for _, s, w in parts) / sum(w for _, _, w in parts) if parts else 0.0
 
-    # Levels in TradingView prices
     levels = []
     if opts_ok:
         if lv["put_wall"]:
@@ -169,7 +245,6 @@ with tab_gold:
     if exp and exp["max_pain"] and ratio:
         pin = tp.to_tv(exp["max_pain"], ratio, offset)
 
-    # Intraday inputs
     m15 = load_bars("GC=F", "15m", "5d")
     h1 = load_bars("GC=F", "1h", "1mo")
     trend = idy.trend_snapshot(m15, h1)
@@ -180,35 +255,27 @@ with tab_gold:
                           (op["net_gex"] > 0) if opts_ok else None, session, pin,
                           exp["dte"] if exp else None, cot["pct"] if cot else None)
 
-    # ---- display
     c1, c2 = st.columns(2)
     c1.metric("Bias (COT + options)", dp.label(total), f"{total:+.2f}")
     c2.metric("Gamma regime",
               ("Positive" if op["net_gex"] > 0 else "Negative") if opts_ok else "unknown")
 
-    st.subheader("Trade plan (intraday)")
-    if plan["side"] == "WAIT":
-        st.info("WAIT. " + plan["reasons"][0])
-    else:
-        msg = f"{plan['side']} | {plan['setup']} | Grade {plan['grade']} ({plan['score']}/100)"
-        (st.success if plan["score"] >= 70 else st.warning if plan["score"] >= 50
-         else st.error)(msg)
-        st.write("**What to expect:** " + plan["expect"])
-        p1, p2 = st.columns(2)
-        p1.metric("Entry", f"{plan['entry']:,.2f}", plan["entry_type"], delta_color="off")
-        p2.metric("Stop loss", f"{plan['sl']:,.2f}", f"risk {plan['risk_pts']:.1f} pts",
-                  delta_color="off")
-        p3, p4 = st.columns(2)
-        p3.metric("TP1", f"{plan['tp1']:,.2f}", f"{plan['rr1']:.1f}R", delta_color="off")
-        p4.metric("TP2", f"{plan['tp2']:,.2f}", f"{plan['rr2']:.1f}R", delta_color="off")
-        lots = risk_usd / (plan["risk_pts"] * 100) if plan["risk_pts"] else 0
-        st.write(f"**Size:** about {lots:.2f} lots for ${risk_usd:,.0f} risk "
-                 f"(assumes 100 oz per lot; check your broker).")
-        for r in plan["reasons"]:
-            st.write("• " + r)
-        st.caption(plan["time_stop"])
-    for w in plan.get("warnings", []):
-        st.warning(w)
+    st.subheader("Signal")
+    signal_panel()
+
+    with st.expander("Current market read (live, changes with price, NOT a signal)"):
+        if plan["side"] == "WAIT":
+            st.write("WAIT. " + plan["reasons"][0])
+        else:
+            st.write(f"**{plan['side']}** | {plan['setup']} | Grade {plan['grade']} "
+                     f"({plan['score']}/100)")
+            st.write(f"Entry {plan['entry']:,.2f} | SL {plan['sl']:,.2f} | "
+                     f"TP1 {plan['tp1']:,.2f} | TP2 {plan['tp2']:,.2f}")
+            st.write("**What to expect:** " + plan["expect"])
+            for r in plan["reasons"]:
+                st.write("• " + r)
+        for w in plan.get("warnings", []):
+            st.warning(w)
 
     st.subheader("Market conditions")
     st.write(f"**Session:** {session['name']}")
@@ -233,7 +300,7 @@ with tab_gold:
         st.subheader("Funds positioning (COT, weekly)")
         st.write(f"**{cot['state']}** | net {cot['mm_net']:,} | percentile {cot['pct']:.0f} | "
                  f"4w change {cot['chg4']:+,}")
-        st.caption(f"Latest COT report date: {cot['date']}. The chart dates are weekly report "
+        st.caption(f"Latest COT report date: {cot['date']}. Chart dates are weekly report "
                    f"dates from past years, not today's date.")
         st.line_chart(cot_df.set_index("date")[["mm_net", "swap_net"]])
 
@@ -260,8 +327,7 @@ with tab_gold:
                      hide_index=True, use_container_width=True)
 
     st.caption("Rule-based framework, not financial advice. Confirm at levels with order flow "
-               "(absorption, icebergs) before entry. Re-type the TradingView price now and "
-               "then, because the futures-to-spot gap drifts.")
+               "before entry.")
 
 # ---------------------------------------------------------------- GBPJPY
 with tab_gj:
@@ -289,7 +355,6 @@ with tab_gj:
             "GBP": gbp_df.set_index("date")["mm_net"],
             "JPY": jpy_df.set_index("date")["mm_net"],
         }))
-        st.caption("No public dealer options data for GBPJPY. Bias only; the intraday plan "
-                   "is built for gold.")
+        st.caption("No public dealer options data for GBPJPY. Bias only; signals are for gold.")
     except Exception as e:
         st.error(f"GBPJPY data failed: {e}")
