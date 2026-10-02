@@ -1,0 +1,42 @@
+name: gold-monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gold-monitor
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install packages
+        run: pip install requests pandas numpy yfinance
+
+      - name: Run monitor
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          MIN_SCORE: "60"
+          OFFSET: ""
+          APP_URL: ""
+        run: python monitor.py
+
+      - name: Save signals
+        run: |
+          git config user.name "gold-monitor"
+          git config user.email "gold-monitor@users.noreply.github.com"
+          git add signals.json || true
+          git diff --cached --quiet || (git commit -m "update signals" && git push)
