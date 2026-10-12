@@ -792,5 +792,38 @@
   "warnings": [
    "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
   ]
+ },
+ {
+  "id": "2026-10-12T14:34:29.506059+00:00",
+  "created": "2026-10-12T14:34:29.506059+00:00",
+  "checked_until": "2026-10-12T14:34:29.506059+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Bias with trend",
+  "grade": "B (mid)",
+  "score": 62,
+  "entry": 4189.346514020647,
+  "entry_type": "Limit pullback",
+  "sl": 4196.332179478237,
+  "tp1": 4182.3608485630575,
+  "tp2": 4175.375183105468,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 6.9856654575896755,
+  "offset": 0.0,
+  "price_at_signal": 4187.60009765625,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
+  "closed_at": null,
+  "close_price": null,
+  "r": null,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "Max-pain magnet sits in the direction of the trade."
+  ],
+  "warnings": [
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
  }
 ]
