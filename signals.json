@@ -1031,5 +1031,38 @@
   "warnings": [
    "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
   ]
+ },
+ {
+  "id": "2026-10-20T15:53:08.439164+00:00",
+  "created": "2026-10-20T15:53:08.439164+00:00",
+  "checked_until": "2026-10-20T15:53:08.439164+00:00",
+  "notified": 0,
+  "side": "LONG",
+  "setup": "Fade support (Gamma flip)",
+  "grade": "A (strong)",
+  "score": 72,
+  "entry": 4149.306874999999,
+  "entry_type": "Limit at level",
+  "sl": 4139.432572544642,
+  "tp1": 4159.181177455356,
+  "tp2": 4169.055479910713,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 9.874302455356883,
+  "offset": 0.0,
+  "price_at_signal": 4154.5,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
+  "closed_at": null,
+  "close_price": null,
+  "r": null,
+  "reasons": [
+   "Positive gamma: fading levels fits.",
+   "Max-pain magnet sits in the direction of the trade."
+  ],
+  "warnings": [
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
  }
 ]
