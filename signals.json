@@ -1618,5 +1618,39 @@
   "warnings": [
    "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
   ]
+ },
+ {
+  "id": "2026-10-22T23:42:49.638893+00:00",
+  "created": "2026-10-22T23:42:49.638893+00:00",
+  "checked_until": "2026-10-22T23:42:49.638893+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Trend continuation (negative gamma)",
+  "grade": "A (strong)",
+  "score": 71,
+  "entry": 4041.733925955636,
+  "entry_type": "Limit pullback",
+  "sl": 4046.669629778181,
+  "tp1": 4036.7982221330913,
+  "tp2": 4031.8625183105464,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 4.935703822544838,
+  "offset": 0.0,
+  "price_at_signal": 4040.5,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
+  "closed_at": null,
+  "close_price": null,
+  "r": null,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "15m and 1h trend both agree.",
+   "Negative gamma: moves extend, trend trade fits."
+  ],
+  "warnings": [
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
  }
 ]
