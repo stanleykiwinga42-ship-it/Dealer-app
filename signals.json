@@ -1554,7 +1554,7 @@
   "id": "2026-10-22T19:21:17.018601+00:00",
   "created": "2026-10-22T19:21:17.018601+00:00",
   "checked_until": "2026-10-22T19:21:17.018601+00:00",
-  "notified": 2,
+  "notified": 3,
   "side": "SHORT",
   "setup": "Trend continuation (negative gamma)",
   "grade": "B (mid)",
@@ -1569,9 +1569,44 @@
   "risk_pts": 6.899989536830162,
   "offset": 0.0,
   "price_at_signal": 4042.199951171875,
-  "status": "TP1_HIT",
+  "status": "TP1_THEN_BE",
   "filled_at": "2026-10-22T19:22:00+00:00",
   "tp1_at": "2026-10-22T20:31:00+00:00",
+  "closed_at": "2026-10-22T22:15:00+00:00",
+  "close_price": 4043.9249485560827,
+  "r": 0.5,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "15m and 1h trend both agree.",
+   "Negative gamma: moves extend, trend trade fits."
+  ],
+  "warnings": [
+   "Price already stretched (RSI): chasing risk.",
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
+ },
+ {
+  "id": "2026-10-22T22:49:43.359521+00:00",
+  "created": "2026-10-22T22:49:43.359521+00:00",
+  "checked_until": "2026-10-22T22:49:43.359521+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Trend continuation (negative gamma)",
+  "grade": "A (strong)",
+  "score": 71,
+  "entry": 4046.64111328125,
+  "entry_type": "Limit pullback",
+  "sl": 4052.00537109375,
+  "tp1": 4041.27685546875,
+  "tp2": 4035.91259765625,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 5.3642578125,
+  "offset": 0.0,
+  "price_at_signal": 4045.300048828125,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
   "closed_at": null,
   "close_price": null,
   "r": null,
@@ -1581,7 +1616,6 @@
    "Negative gamma: moves extend, trend trade fits."
   ],
   "warnings": [
-   "Price already stretched (RSI): chasing risk.",
    "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
   ]
  }
