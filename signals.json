@@ -1515,5 +1515,39 @@
    "Price already stretched (RSI): chasing risk.",
    "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
   ]
+ },
+ {
+  "id": "2026-10-22T18:46:21.422410+00:00",
+  "created": "2026-10-22T18:46:21.422410+00:00",
+  "checked_until": "2026-10-22T18:46:21.422410+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Trend continuation (negative gamma)",
+  "grade": "B (mid)",
+  "score": 68,
+  "entry": 4054.4143807547434,
+  "entry_type": "Limit pullback",
+  "sl": 4061.6715131487167,
+  "tp1": 4047.15724836077,
+  "tp2": 4039.900115966797,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 7.257132393973279,
+  "offset": 0.0,
+  "price_at_signal": 4052.60009765625,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
+  "closed_at": null,
+  "close_price": null,
+  "r": null,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "15m and 1h trend both agree.",
+   "Negative gamma: moves extend, trend trade fits."
+  ],
+  "warnings": [
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
  }
 ]
