@@ -3272,7 +3272,7 @@
   "id": "2026-11-15T23:28:26.383805+00:00",
   "created": "2026-11-15T23:28:26.383805+00:00",
   "checked_until": "2026-11-15T23:28:26.383805+00:00",
-  "notified": 0,
+  "notified": 2,
   "side": "SHORT",
   "setup": "Trend continuation (negative gamma)",
   "grade": "A (strong)",
@@ -3287,6 +3287,40 @@
   "risk_pts": 5.8357107979909415,
   "offset": 0.0,
   "price_at_signal": 3882.699951171875,
+  "status": "LOST_SL",
+  "filled_at": "2026-11-15T23:30:00+00:00",
+  "tp1_at": null,
+  "closed_at": "2026-11-15T23:36:00+00:00",
+  "close_price": 3889.994589669364,
+  "r": -1.0,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "15m and 1h trend both agree.",
+   "Negative gamma: moves extend, trend trade fits."
+  ],
+  "warnings": [
+   "Options expire in 1 day(s): pinning and erratic moves near the max-pain level are common."
+  ]
+ },
+ {
+  "id": "2026-11-16T02:57:58.179976+00:00",
+  "created": "2026-11-16T02:57:58.179976+00:00",
+  "checked_until": "2026-11-16T02:57:58.179976+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Trend continuation (negative gamma)",
+  "grade": "A (strong)",
+  "score": 74,
+  "entry": 3883.789328438895,
+  "entry_type": "Limit pullback",
+  "sl": 3895.7464468819753,
+  "tp1": 3871.832209995815,
+  "tp2": 3859.875091552735,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 11.957118443080162,
+  "offset": 0.0,
+  "price_at_signal": 3880.800048828125,
   "status": "PENDING",
   "filled_at": null,
   "tp1_at": null,
@@ -3299,7 +3333,7 @@
    "Negative gamma: moves extend, trend trade fits."
   ],
   "warnings": [
-   "Options expire in 1 day(s): pinning and erratic moves near the max-pain level are common."
+   "Options expire in 0 day(s): pinning and erratic moves near the max-pain level are common."
   ]
  }
 ]
