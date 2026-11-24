@@ -3437,5 +3437,36 @@
   "warnings": [
    "Options expire in 1 day(s): pinning and erratic moves near the max-pain level are common."
   ]
+ },
+ {
+  "id": "2026-11-24T09:41:59.489122+00:00",
+  "created": "2026-11-24T09:41:59.489122+00:00",
+  "checked_until": "2026-11-24T09:41:59.489122+00:00",
+  "notified": 0,
+  "side": "SHORT",
+  "setup": "Bias with trend",
+  "grade": "A (strong)",
+  "score": 73,
+  "entry": 3623.5839189801895,
+  "entry_type": "Limit pullback",
+  "sl": 3633.9195949009486,
+  "tp1": 3613.2482430594305,
+  "tp2": 3602.9125671386714,
+  "rr1": 1.0,
+  "rr2": 2.0,
+  "risk_pts": 10.335675920759058,
+  "offset": 0.0,
+  "price_at_signal": 3621.0,
+  "status": "PENDING",
+  "filled_at": null,
+  "tp1_at": null,
+  "closed_at": null,
+  "close_price": null,
+  "r": null,
+  "reasons": [
+   "Dealer/COT bias agrees with the trade.",
+   "15m and 1h trend both agree."
+  ],
+  "warnings": []
  }
 ]
